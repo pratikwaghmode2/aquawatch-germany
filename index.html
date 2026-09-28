@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AquaWatch EO | Germany Freshwater Algae & Hydraulic Simulator</title>
+  
+  <!-- Leaflet CSS & JS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Plotly.js for Interactive Charts -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              900: '#164e63',
+            },
+            surface: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Pulsing risk badge */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.08); }
+    }
+    .pulse-risk { animation: pulse-glow 2s infinite ease-in-out; }
+    
+    .map-container {
+      height: 380px;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+    
+    .custom-slider {
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: #334155;
+      outline: none;
+    }
+    .custom-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #06b6d4;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+    }
+  </style>
+</head>
+<body class="bg-surface-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="border-b border-slate-800 bg-surface-900/90 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 py-3.5 shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
+          🌊
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              AquaWatch EO
+            </h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 font-medium">
+              Germany Freshwater Early Warning
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">EIT Water Hackathon Munich 2026 • Challenge 4: Algae EO & Hydraulic Controls</p>
+        </div>
+      </div>
+
+      <!-- Controls: Station, Year, and External Links -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="flex items-center bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1 text-xs">
+          <span class="text-slate-400 mr-2">📅 Year:</span>
+          <select id="yearSelect" class="bg-transparent text-cyan-300 font-semibold focus:outline-none cursor-pointer">
+            <option value="2021" class="bg-slate-800 text-slate-200">2021 (Cool Summer)</option>
+            <option value="2022" class="bg-slate-800 text-amber-300">2022 (Historic Oder Disaster)</option>
+            <option value="2023" class="bg-slate-800 text-slate-200">2023 (Warm & Variable)</option>
+            <option value="2024" class="bg-slate-800 text-slate-200">2024 (Moderate Runoff)</option>
+            <option value="2025" selected class="bg-slate-800 text-red-300">2025 (Severe Heat Stress)</option>
+          </select>
+        </div>
+
+        <a href="https://github.com/pratikwaghmode2/aquawatch-germany" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub Repo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+    <!-- TOP TELEMETRY KPI BANNER -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+      <div class="bg-surface-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Selected Basin</span>
+        <div class="mt-1">
+          <div id="kpiBasinName" class="text-base font-bold text-cyan-400 truncate">Oder River</div>
+          <span id="kpiBasinType" class="inline-block mt-0.5 text-[11px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+            River Reach
+          </span>
+        </div>
+      </div>
+
+      <div class="bg-surface-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Peak Water Temp</span>
+        <div class="mt-1 flex items-baseline gap-2">
+          <span id="kpiPeakTemp" class="text-2xl font-black text-rose-400">23.8°C</span>
+          <span id="kpiTempDelta" class="text-xs text-rose-300 font-medium">+2.1° vs avg</span>
+        </div>
+      </div>
+
+      <div class="bg-surface-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Min. Water Balance</span>
+        <div class="mt-1 flex items-baseline gap-2">
+          <span id="kpiWaterSurplus" class="text-2xl font-black text-emerald-400">+34 m³/s</span>
+          <span class="text-xs text-slate-400 font-normal">Surplus</span>
+        </div>
+      </div>
+
+      <div class="bg-surface-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ecological Status</span>
+        <div class="mt-1 flex items-center gap-2">
+          <div id="kpiRiskPill" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-950/80 text-amber-300 border border-amber-600 pulse-risk">
+            ⚠️ WARNING RISK
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN WORKSPACE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN: MAP & WHAT-IF SIMULATOR CONTROLS (5 COLS) -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <!-- MAP CARD -->
+        <div class="bg-surface-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <span class="text-base">🗺️</span>
+              <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Germany Monitoring Grid</h2>
+            </div>
+            <span class="text-xs text-slate-400">10 Basins (Click pin to select)</span>
+          </div>
+          
+          <div id="germanyMap" class="map-container"></div>
+          
+          <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span> River Gauges (5)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> Lake/Reservoirs (5)</span>
+            <span class="text-slate-500">Source: Copernicus / Landsat 8-9</span>
+          </div>
+        </div>
+
+        <!-- INTERACTIVE WHAT-IF SIMULATOR CARD -->
+        <div class="bg-surface-900 border border-indigo-900/60 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+          <div class="absolute -right-8 -top-8 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <span class="text-base">🎛️</span>
+              <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-300">What-If Hydraulic Simulator</h2>
+            </div>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700/60 font-semibold">
+              Real-Time Dynamic
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+            Test climate warming anomalies and operational hydraulic levers to simulate bloom response and water stress in real time.
+          </p>
+
+          <!-- 4 QUICK PRESETS -->
+          <div class="grid grid-cols-2 gap-2 mb-4">
+            <button onclick="applyPreset('baseline')" class="px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition text-left flex items-center gap-1.5">
+              <span>☀️</span> Normal Baseline
+            </button>
+            <button onclick="applyPreset('heatwave')" class="px-2.5 py-1.5 text-xs rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/80 text-amber-300 font-medium transition text-left flex items-center gap-1.5">
+              <span>🌡️</span> Heatwave (+2.8°C)
+            </button>
+            <button onclick="applyPreset('flushing')" class="px-2.5 py-1.5 text-xs rounded-lg bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/80 text-cyan-300 font-medium transition text-left flex items-center gap-1.5">
+              <span>🌊</span> Weir Flush (+35 m³/s)
+            </button>
+            <button onclick="applyPreset('crisis')" class="px-2.5 py-1.5 text-xs rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/80 text-rose-300 font-medium transition text-left flex items-center gap-1.5">
+              <span>🚨</span> Compound Crisis
+            </button>
+          </div>
+
+          <!-- SLIDERS -->
+          <div class="space-y-4">
+            <!-- Warming Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-rose-400">🌡️ Water Temp Anomaly (&Delta;T)</span>
+                <span id="sliderTempVal" class="text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800 font-mono">+0.0°C</span>
+              </div>
+              <input type="range" id="sliderTemp" min="0" max="5.0" step="0.1" value="0.0" class="custom-slider w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                <span>0°C (Current)</span>
+                <span>+2.5°C (IPCC Mid)</span>
+                <span>+5.0°C (Severe)</span>
+              </div>
+            </div>
+
+            <!-- Flushing Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-cyan-400">🌊 Upstream Weir Flushing Pulse (+Q<sub>flush</sub>)</span>
+                <span id="sliderFlushVal" class="text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800 font-mono">+0 m³/s</span>
+              </div>
+              <input type="range" id="sliderFlush" min="0" max="80" step="5" value="0" class="custom-slider w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                <span>0 m³/s (Off)</span>
+                <span>+40 m³/s (Standard Pulse)</span>
+                <span>+80 m³/s (Max Flush)</span>
+              </div>
+            </div>
+
+            <!-- Moratorium Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-amber-400">🚫 Agricultural Abstraction Moratorium</span>
+                <span id="sliderMoratoriumVal" class="text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800 font-mono">0% cut</span>
+              </div>
+              <input type="range" id="sliderMoratorium" min="0" max="50" step="5" value="0" class="custom-slider w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                <span>0% (Unrestricted)</span>
+                <span>-25% (Emergency Rationing)</span>
+                <span>-50% (Max Ban)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SIMULATION IMPACT SCORECARD -->
+          <div class="mt-5 p-3.5 bg-slate-950/80 rounded-xl border border-indigo-900/40 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-300 block">Simulated Hydraulic Impact:</span>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 block">Peak Biomass</span>
+                <span id="scorecardBiomass" class="text-sm font-bold text-lime-400 font-mono">42.5%</span>
+              </div>
+              <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 block">Min Surplus</span>
+                <span id="scorecardSurplus" class="text-sm font-bold text-cyan-400 font-mono">+34 m³/s</span>
+              </div>
+              <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 block">Risk Tier</span>
+                <span id="scorecardRiskTier" class="text-xs font-bold text-amber-400 uppercase">Warning</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: THE 4-PARAMETER GRAPH & CONTROLS (7 COLS) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <div class="bg-surface-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+          
+          <!-- GRAPH HEADER & TOGGLE BUTTONS -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-3">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">📈</span>
+                <h2 class="text-base font-bold text-slate-200">
+                  4-Parameter Nexus Telemetry
+                </h2>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Synchronized daily time series: Water Temperature, Supply, Demand, and Algae Formation
+              </p>
+            </div>
+
+            <!-- Display toggles: Normalized vs Natural & Trendline -->
+            <div class="flex items-center gap-2">
+              <button id="toggleNormBtn" onclick="toggleNormalize()" 
+                      class="px-3 py-1 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition">
+                🔀 Normalize (0-100%)
+              </button>
+              <button id="toggleTrendBtn" onclick="toggleTrendlines()" 
+                      class="px-3 py-1 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition">
+                📉 Trendline (7d)
+              </button>
+            </div>
+          </div>
+
+          <!-- STRICT 4-PARAMETER LEGEND EXPLANATION -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 my-3 text-xs">
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+              <span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block shadow-sm shadow-red-500/50"></span>
+              <div>
+                <div class="font-semibold text-slate-200">Temperature</div>
+                <div class="text-[10px] text-slate-400">°C (LST satellite)</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+              <span class="w-3 h-3 rounded-full bg-[#06b6d4] inline-block shadow-sm shadow-cyan-500/50"></span>
+              <div>
+                <div class="font-semibold text-slate-200">Water Supply</div>
+                <div class="text-[10px] text-slate-400">m³/s inflow</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+              <span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block shadow-sm shadow-amber-500/50"></span>
+              <div>
+                <div class="font-semibold text-slate-200">Water Demand</div>
+                <div class="text-[10px] text-slate-400">m³/s withdrawal</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+              <span class="w-3 h-3 rounded-full bg-[#22c55e] inline-block shadow-sm shadow-emerald-500/50"></span>
+              <div>
+                <div class="font-semibold text-slate-200">Algae Index</div>
+                <div class="text-[10px] text-slate-400">0–100% biomass</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PLOTLY CHART CONTAINER -->
+          <div id="chartContainer" class="w-full h-[450px]"></div>
+
+          <!-- BASIN SCIENTIFIC PROFILE INFO -->
+          <div class="mt-4 pt-3.5 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-400">
+            <div>
+              <span class="font-semibold text-slate-300 block mb-0.5">Morphological Classification:</span>
+              <span id="basinDesc" class="text-slate-400 leading-tight">Narrow river channel (120-200m width, low summer baseflow).</span>
+            </div>
+            <div>
+              <span class="font-semibold text-slate-300 block mb-0.5">Management Authority:</span>
+              <span id="basinJurisdiction" class="text-slate-400 leading-tight">German-Polish Transboundary Reach (Brandenburg).</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT SIMULATION & MAPPING ENGINE -->
+  <script>
+    // -----------------------------------------------------------------
+    // 1. BASIN PROFILES (10 GERMAN BASINS)
+    // -----------------------------------------------------------------
+    const BASINS = {
+      oder_river: {
+        name: "Oder River (Odra - Polish Border)",
+        type: "River",
+        lat: 52.345, lon: 14.550,
+        desc: "Narrow River Channel (120–200m width, mean depth 2.8m). Flashy thermal response.",
+        jurisdiction: "German-Polish Transboundary Reach (Brandenburg / Lubuskie)",
+        baseTemp: 20.8,
+        baseSupply: 56.0,
+        baseDemand: 22.0,
+        minEcoFlow: 18.5,
+        baseNdvi: -0.06,
+        maxBloom: 0.48,
+        years: {
+          2021: { tempOffset: -0.7, heatPotency: 1.2, streak: 2 },
+          2022: { tempOffset: +2.2, heatPotency: 5.2, streak: 9 }, // Catastrophic golden alga disaster
+          2023: { tempOffset: +0.8, heatPotency: 3.4, streak: 5 },
+          2024: { tempOffset: +0.3, heatPotency: 2.5, streak: 4 },
+          2025: { tempOffset: +1.6, heatPotency: 4.6, streak: 7 }
+        }
+      },
+      rhine_river: {
+        name: "Middle Rhine Reach (Mittelrhein / Kaub)",
+        type: "River",
+        lat: 50.110, lon: 7.720,
+        desc: "High Discharge River Channel (350–500m width, high mixing velocity).",
+        jurisdiction: "Rhine River Basin Commission (ICPR / Rhineland-Palatinate)",
+        baseTemp: 21.2,
+        baseSupply: 1450.0,
+        baseDemand: 180.0,
+        minEcoFlow: 650.0,
+        baseNdvi: -0.08,
+        maxBloom: 0.28,
+        years: {
+          2021: { tempOffset: -0.5, heatPotency: 1.0, streak: 2 },
+          2022: { tempOffset: +2.1, heatPotency: 4.8, streak: 8 },
+          2023: { tempOffset: +1.1, heatPotency: 3.1, streak: 4 },
+          2024: { tempOffset: -0.1, heatPotency: 2.0, streak: 3 },
+          2025: { tempOffset: +1.4, heatPotency: 4.2, streak: 6 }
+        }
+      },
+      elbe_river: {
+        name: "Middle Elbe Reach (Magdeburg)",
+        type: "River",
+        lat: 52.130, lon: 11.630,
+        desc: "Broad lowland river with extensive groyne fields creating low-flow backwaters.",
+        jurisdiction: "Elbe River Commission (IKSE / Saxony-Anhalt)",
+        baseTemp: 21.6,
+        baseSupply: 290.0,
+        baseDemand: 75.0,
+        minEcoFlow: 140.0,
+        baseNdvi: -0.05,
+        maxBloom: 0.42,
+        years: {
+          2021: { tempOffset: -0.8, heatPotency: 1.5, streak: 2 },
+          2022: { tempOffset: +2.3, heatPotency: 5.0, streak: 8 },
+          2023: { tempOffset: +1.2, heatPotency: 3.6, streak: 5 },
+          2024: { tempOffset: +0.2, heatPotency: 2.3, streak: 3 },
+          2025: { tempOffset: +1.8, heatPotency: 4.5, streak: 7 }
+        }
+      },
+      danube_river: {
+        name: "Bavarian Danube Reach (Regensburg)",
+        type: "River",
+        lat: 49.020, lon: 12.100,
+        desc: "Alpine-fed river with regulated barrage chain and significant gravel beds.",
+        jurisdiction: "Danube Protection Commission (ICPDR / Bavaria LfU)",
+        baseTemp: 19.4,
+        baseSupply: 420.0,
+        baseDemand: 68.0,
+        minEcoFlow: 210.0,
+        baseNdvi: -0.07,
+        maxBloom: 0.29,
+        years: {
+          2021: { tempOffset: -0.4, heatPotency: 1.1, streak: 2 },
+          2022: { tempOffset: +1.8, heatPotency: 4.0, streak: 6 },
+          2023: { tempOffset: +0.9, heatPotency: 2.8, streak: 4 },
+          2024: { tempOffset: +0.1, heatPotency: 1.9, streak: 3 },
+          2025: { tempOffset: +1.3, heatPotency: 3.7, streak: 5 }
+        }
+      },
+      weser_river: {
+        name: "Middle Weser Reach (Bremen / Verden)",
+        type: "River",
+        lat: 53.080, lon: 8.800,
+        desc: "Tidally influenced lower reach with potassium salt influx and barrages.",
+        jurisdiction: "Weser River Basin Authority (FGG Weser / Lower Saxony)",
+        baseTemp: 20.4,
+        baseSupply: 165.0,
+        baseDemand: 42.0,
+        minEcoFlow: 75.0,
+        baseNdvi: -0.06,
+        maxBloom: 0.35,
+        years: {
+          2021: { tempOffset: -0.6, heatPotency: 1.3, streak: 2 },
+          2022: { tempOffset: +1.9, heatPotency: 4.2, streak: 7 },
+          2023: { tempOffset: +0.7, heatPotency: 2.9, streak: 4 },
+          2024: { tempOffset: +0.0, heatPotency: 2.1, streak: 3 },
+          2025: { tempOffset: +1.5, heatPotency: 3.9, streak: 6 }
+        }
+      },
+      lake_constance: {
+        name: "Lake Constance (Bodensee)",
+        type: "Lake",
+        lat: 47.636, lon: 9.380,
+        desc: "Deep pre-alpine oligotrophic lake (536 km², depth 90m). High thermal buffering.",
+        jurisdiction: "International Water Protection Commission (IGKB / BW / Bavaria)",
+        baseTemp: 18.8,
+        baseSupply: 360.0,
+        baseDemand: 48.0,
+        minEcoFlow: 180.0,
+        baseNdvi: -0.09,
+        maxBloom: 0.22,
+        years: {
+          2021: { tempOffset: -0.3, heatPotency: 0.8, streak: 1 },
+          2022: { tempOffset: +1.4, heatPotency: 3.1, streak: 5 },
+          2023: { tempOffset: +0.6, heatPotency: 2.0, streak: 3 },
+          2024: { tempOffset: -0.1, heatPotency: 1.5, streak: 2 },
+          2025: { tempOffset: +1.1, heatPotency: 2.9, streak: 4 }
+        }
+      },
+      lake_mueggelsee: {
+        name: "Lake Müggelsee (Berlin Spree Lowland)",
+        type: "Lake",
+        lat: 52.433, lon: 13.633,
+        desc: "Shallow polymictic lowland lake (4m depth, 7.4 km²). Vulnerable to severe summer blooms.",
+        jurisdiction: "Senate Department for Environment Berlin / IGB Leibniz Institute",
+        baseTemp: 22.4,
+        baseSupply: 24.0,
+        baseDemand: 16.5,
+        minEcoFlow: 7.0,
+        baseNdvi: -0.04,
+        maxBloom: 0.55,
+        years: {
+          2021: { tempOffset: -0.9, heatPotency: 1.6, streak: 3 },
+          2022: { tempOffset: +2.4, heatPotency: 5.6, streak: 9 },
+          2023: { tempOffset: +1.3, heatPotency: 3.8, streak: 6 },
+          2024: { tempOffset: +0.4, heatPotency: 2.8, streak: 4 },
+          2025: { tempOffset: +2.0, heatPotency: 5.1, streak: 8 }
+        }
+      },
+      lake_chiemsee: {
+        name: "Lake Chiemsee (Bavarian Sea)",
+        type: "Lake",
+        lat: 47.880, lon: 12.400,
+        desc: "Large pre-alpine lake (79.9 km², max depth 73m). Fed by the Tiroler Achen.",
+        jurisdiction: "Water Management Authority Traunstein (WWA / Bavaria LfU)",
+        baseTemp: 19.6,
+        baseSupply: 85.0,
+        baseDemand: 14.0,
+        minEcoFlow: 45.0,
+        baseNdvi: -0.08,
+        maxBloom: 0.27,
+        years: {
+          2021: { tempOffset: -0.4, heatPotency: 0.9, streak: 2 },
+          2022: { tempOffset: +1.5, heatPotency: 3.4, streak: 5 },
+          2023: { tempOffset: +0.7, heatPotency: 2.2, streak: 3 },
+          2024: { tempOffset: +0.0, heatPotency: 1.7, streak: 2 },
+          2025: { tempOffset: +1.2, heatPotency: 3.0, streak: 4 }
+        }
+      },
+      lake_starnberg: {
+        name: "Lake Starnberg (Starnberger See)",
+        type: "Lake",
+        lat: 47.900, lon: 11.310,
+        desc: "Deep monomictic pre-alpine lake (56.3 km², depth 127m). Very high water clarity.",
+        jurisdiction: "Water Management Authority Weilheim (WWA / Bavaria)",
+        baseTemp: 19.1,
+        baseSupply: 32.0,
+        baseDemand: 7.5,
+        minEcoFlow: 18.0,
+        baseNdvi: -0.09,
+        maxBloom: 0.20,
+        years: {
+          2021: { tempOffset: -0.3, heatPotency: 0.7, streak: 1 },
+          2022: { tempOffset: +1.3, heatPotency: 2.8, streak: 4 },
+          2023: { tempOffset: +0.5, heatPotency: 1.8, streak: 3 },
+          2024: { tempOffset: -0.1, heatPotency: 1.3, streak: 2 },
+          2025: { tempOffset: +1.0, heatPotency: 2.6, streak: 4 }
+        }
+      },
+      bautzen_reservoir: {
+        name: "Bautzen Reservoir (Talsperre Bautzen)",
+        type: "Lake",
+        lat: 51.215, lon: 14.460,
+        desc: "Hyper-eutrophic Saxon dammed reservoir (5.3 km²). Strong cyanobacterial history (Microcystis).",
+        jurisdiction: "State Dam Administration of Saxony (LTV Sachsen)",
+        baseTemp: 22.0,
+        baseSupply: 14.5,
+        baseDemand: 8.0,
+        minEcoFlow: 3.8,
+        baseNdvi: -0.03,
+        maxBloom: 0.58,
+        years: {
+          2021: { tempOffset: -0.8, heatPotency: 1.7, streak: 3 },
+          2022: { tempOffset: +2.5, heatPotency: 5.8, streak: 10 },
+          2023: { tempOffset: +1.4, heatPotency: 4.0, streak: 6 },
+          2024: { tempOffset: +0.5, heatPotency: 3.0, streak: 4 },
+          2025: { tempOffset: +2.1, heatPotency: 5.4, streak: 8 }
+        }
+      }
+    };
+
+    // Global state
+    let activeBasinKey = "oder_river";
+    let activeYear = 2025;
+    let isNormalized = false;
+    let showTrendlines = false;
+    let mapInstance = null;
+    let mapMarkers = {};
+
+    // -----------------------------------------------------------------
+    // 2. MATHEMATICAL TIME-SERIES & SIMULATOR GENERATOR
+    // -----------------------------------------------------------------
+    function generateTimeSeries(basinKey, year, deltaTemp, flushPulse, moratoriumPct) {
+      const basin = BASINS[basinKey];
+      const yrCfg = basin.years[year] || { tempOffset: 0.0, heatPotency: 2.5, streak: 4 };
+      const totalDays = 92; // June 1 to August 31
+      
+      const dates = [];
+      const temps = [];
+      const supplies = [];
+      const demands = [];
+      const algaePcts = [];
+
+      const startMonth = 5; // 0-indexed June = 5
+      for (let i = 0; i < totalDays; i++) {
+        const d = new Date(year, startMonth, 1 + i);
+        dates.push(d.toISOString().split('T')[0]);
+
+        // Seasonal sinusoid
+        const seasonal = Math.sin(Math.PI * (i / totalDays)) * 4.2;
+        
+        // Heatwave pulse
+        const hwCenter = Math.floor(totalDays * (0.52 + 0.08 * Math.sin(year)));
+        const hwDist = i - hwCenter;
+        const hwShape = yrCfg.heatPotency * Math.exp(-(hwDist * hwDist) / (2 * (5.5 * 5.5)));
+        
+        // Pseudo-random deterministic noise
+        const pseudoNoise = Math.sin(i * 12.3 + year * 7) * 0.35;
+        
+        // Base simulated temperature + What-If warming delta
+        const baseT = basin.baseTemp + yrCfg.tempOffset + deltaTemp;
+        const tVal = Math.round((baseT + seasonal + hwShape + pseudoNoise) * 100) / 100;
+        temps.push(tVal);
+
+        // Algae bloom dynamic
+        const tempTrigger = Math.max(0.0, tVal - 19.5);
+        let heatAccum = Math.pow(tempTrigger, 1.45) * 0.018;
+
+        // Flow flushing mitigation (higher flow reduces river residence time)
+        let flushMitigation = 1.0;
+        if (basin.type === "River") {
+          const effectiveFlush = flushPulse / (basin.baseSupply + 1e-4);
+          flushMitigation = Math.max(0.18, 1.0 - effectiveFlush * 0.75);
+        } else {
+          // Reservoirs / Lakes experience dilution from flushing
+          const effectiveFlush = flushPulse / (basin.baseSupply + 1e-4);
+          flushMitigation = Math.max(0.40, 1.0 - effectiveFlush * 0.35);
+        }
+
+        const ndviVal = basin.baseNdvi + (heatAccum * (basin.maxBloom - basin.baseNdvi)) * flushMitigation;
+        const algaePct = Math.min(100.0, Math.max(0.0, ((ndviVal - basin.baseNdvi) / (basin.maxBloom - basin.baseNdvi + 1e-4)) * 100.0));
+        algaePcts.push(Math.round(algaePct * 10) / 10);
+
+        // Water Supply (Inflow drops during heatwaves, boosted by flushing pulse)
+        const droughtFactor = Math.min(0.55, (hwShape / 8.0) * 0.65);
+        const supplyNoise = Math.cos(i * 9.1 + year) * 0.02;
+        const currentSupply = Math.max(
+          basin.minEcoFlow,
+          (basin.baseSupply * (1.0 - droughtFactor) * (1.0 + supplyNoise)) + flushPulse
+        );
+        supplies.push(Math.round(currentSupply * 10) / 10);
+
+        // Water Demand (Rises during heat, mitigated by moratorium)
+        const demandSurge = (Math.max(0.0, tVal - 19.0) / 8.0) * 0.65;
+        const demandMitigation = (1.0 - (moratoriumPct / 100.0));
+        const currentDemand = basin.baseDemand * (1.0 + demandSurge) * demandMitigation;
+        demands.push(Math.round(currentDemand * 10) / 10);
+      }
+
+      return { dates, temps, supplies, demands, algaePcts };
+    }
+
+    // 7-day rolling average helper
+    function rollingMean(arr, window = 7) {
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const start = Math.max(0, i - Math.floor(window / 2));
+        const end = Math.min(arr.length, i + Math.ceil(window / 2));
+        const slice = arr.slice(start, end);
+        const avg = slice.reduce((acc, v) => acc + v, 0) / slice.length;
+        result.push(Math.round(avg * 100) / 100);
+      }
+      return result;
+    }
+
+    // -----------------------------------------------------------------
+    // 3. PLOTLY GRAPH RENDERING (STRICT 4-PARAMETER TRACES)
+    // -----------------------------------------------------------------
+    function renderChart(data) {
+      const { dates, temps, supplies, demands, algaePcts } = data;
+
+      let plotData = [];
+
+      if (isNormalized) {
+        // Normalize each series 0 to 100%
+        const norm = (arr) => {
+          const min = Math.min(...arr);
+          const max = Math.max(...arr);
+          const span = max - min || 1;
+          return arr.map(v => Math.round(((v - min) / span) * 1000) / 10);
+        };
+
+        const tNorm = showTrendlines ? rollingMean(norm(temps)) : norm(temps);
+        const sNorm = showTrendlines ? rollingMean(norm(supplies)) : norm(supplies);
+        const dNorm = showTrendlines ? rollingMean(norm(demands)) : norm(demands);
+        const aNorm = showTrendlines ? rollingMean(norm(algaePcts)) : norm(algaePcts);
+
+        plotData = [
+          {
+            x: dates, y: tNorm, name: "Water Temperature (%)",
+            line: { color: '#ef4444', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: sNorm, name: "Water Supply (%)",
+            line: { color: '#06b6d4', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: dNorm, name: "Water Demand (%)",
+            line: { color: '#f59e0b', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: aNorm, name: "Algae Formation (%)",
+            line: { color: '#22c55e', width: 2.5 }, mode: 'lines'
+          }
+        ];
+      } else {
+        // Natural Dual-Axis Units
+        const tVals = showTrendlines ? rollingMean(temps) : temps;
+        const sVals = showTrendlines ? rollingMean(supplies) : supplies;
+        const dVals = showTrendlines ? rollingMean(demands) : demands;
+        const aVals = showTrendlines ? rollingMean(algaePcts) : algaePcts;
+
+        plotData = [
+          {
+            x: dates, y: tVals, name: "Water Temperature (°C)",
+            yaxis: 'y1',
+            line: { color: '#ef4444', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: sVals, name: "Water Supply (m³/s)",
+            yaxis: 'y2',
+            line: { color: '#06b6d4', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: dVals, name: "Water Demand (m³/s)",
+            yaxis: 'y2',
+            line: { color: '#f59e0b', width: 2.5 }, mode: 'lines'
+          },
+          {
+            x: dates, y: aVals, name: "Algae Formation (Index %)",
+            yaxis: 'y3',
+            line: { color: '#22c55e', width: 2.5 }, mode: 'lines'
+          }
+        ];
+      }
+
+      const layout = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        margin: { l: 50, r: 60, t: 30, b: 40 },
+        hovermode: 'x unified',
+        showlegend: true,
+        legend: {
+          orientation: 'h',
+          x: 0.05,
+          y: 1.15,
+          font: { color: '#94a3b8', size: 11 }
+        },
+        xaxis: {
+          gridcolor: '#1e293b',
+          tickfont: { color: '#94a3b8', size: 10 },
+          zerolinecolor: '#334155'
+        },
+        yaxis: isNormalized ? {
+          title: { text: "Normalized Metric (0-100%)", font: { color: '#94a3b8', size: 11 } },
+          gridcolor: '#1e293b',
+          tickfont: { color: '#94a3b8', size: 10 },
+          range: [-2, 105]
+        } : {
+          title: { text: "Water Temp (°C)", font: { color: '#ef4444', size: 11 } },
+          tickfont: { color: '#ef4444', size: 10 },
+          gridcolor: '#1e293b'
+        },
+        yaxis2: isNormalized ? undefined : {
+          title: { text: "Hydraulic Flow (m³/s)", font: { color: '#06b6d4', size: 11 } },
+          tickfont: { color: '#06b6d4', size: 10 },
+          overlaying: 'y',
+          side: 'right',
+          gridcolor: 'transparent'
+        },
+        yaxis3: isNormalized ? undefined : {
+          title: { text: "Algae Bloom %", font: { color: '#22c55e', size: 11 } },
+          tickfont: { color: '#22c55e', size: 10 },
+          overlaying: 'y',
+          side: 'right',
+          position: 0.96,
+          gridcolor: 'transparent',
+          range: [0, 100]
+        }
+      };
+
+      const config = {
+        responsive: true,
+        displayModeBar: false
+      };
+
+      Plotly.react('chartContainer', plotData, layout, config);
+    }
+
+    // -----------------------------------------------------------------
+    // 4. MAP INITIALIZATION (LEAFLET WITH CARTO DARK MATTER)
+    // -----------------------------------------------------------------
+    function initMap() {
+      // Germany center coordinates
+      mapInstance = L.map('germanyMap', {
+        center: [51.1657, 10.4515],
+        zoom: 6,
+        zoomControl: true,
+        attributionControl: false
+      });
+
+      // Dark tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(mapInstance);
+
+      // Create pins for all 10 basins
+      Object.keys(BASINS).forEach(key => {
+        const b = BASINS[key];
+        const isRiver = b.type === "River";
+        const pinColor = isRiver ? "#38bdf8" : "#34d399";
+
+        const markerHtml = `
+          <div style="background-color: ${pinColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #0f172a; box-shadow: 0 0 10px ${pinColor}; cursor: pointer;"></div>
+        `;
+
+        const customIcon = L.divIcon({
+          className: 'custom-pin',
+          html: markerHtml,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        const marker = L.marker([b.lat, b.lon], { icon: customIcon }).addTo(mapInstance);
+
+        marker.bindPopup(`
+          <div style="font-family: sans-serif; font-size: 12px; color: #0f172a;">
+            <strong>${b.name}</strong><br>
+            <span style="color: #64748b;">${b.desc}</span><br>
+            <button onclick="selectBasin('${key}')" style="margin-top: 6px; padding: 3px 8px; background: #0891b2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Select Basin
+            </button>
+          </div>
+        `);
+
+        marker.on('click', () => {
+          selectBasin(key);
+        });
+
+        mapMarkers[key] = marker;
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // 5. APPLICATION STATE CONTROLLERS
+    // -----------------------------------------------------------------
+    function selectBasin(basinKey) {
+      activeBasinKey = basinKey;
+      const basin = BASINS[basinKey];
+
+      // Update Map View
+      if (mapInstance && basin) {
+        mapInstance.panTo([basin.lat, basin.lon], { animate: true, duration: 0.8 });
+        if (mapMarkers[basinKey]) {
+          mapMarkers[basinKey].openPopup();
+        }
+      }
+
+      // Update UI descriptions
+      document.getElementById('kpiBasinName').textContent = basin.name.split('(')[0];
+      document.getElementById('kpiBasinType').textContent = basin.type === 'River' ? 'River Reach' : 'Lake / Reservoir';
+      document.getElementById('basinDesc').textContent = basin.desc;
+      document.getElementById('basinJurisdiction').textContent = basin.jurisdiction;
+
+      updateSimulation();
+    }
+
+    function updateSimulation() {
+      const deltaTemp = parseFloat(document.getElementById('sliderTemp').value);
+      const flushPulse = parseFloat(document.getElementById('sliderFlush').value);
+      const moratoriumPct = parseFloat(document.getElementById('sliderMoratorium').value);
+
+      // Label outputs
+      document.getElementById('sliderTempVal').textContent = `+${deltaTemp.toFixed(1)}°C`;
+      document.getElementById('sliderFlushVal').textContent = `+${flushPulse} m³/s`;
+      document.getElementById('sliderMoratoriumVal').textContent = `-${moratoriumPct}% cut`;
+
+      // Run generator
+      const simData = generateTimeSeries(activeBasinKey, activeYear, deltaTemp, flushPulse, moratoriumPct);
+
+      // Re-render chart
+      renderChart(simData);
+
+      // Update KPI scorecard
+      const peakTemp = Math.max(...simData.temps);
+      const peakBiomass = Math.max(...simData.algaePcts);
+      
+      const surpluses = simData.supplies.map((s, i) => s - simData.demands[i]);
+      const minSurplus = Math.min(...surpluses);
+
+      document.getElementById('kpiPeakTemp').textContent = `${peakTemp.toFixed(1)}°C`;
+      document.getElementById('kpiWaterSurplus').textContent = `${minSurplus >= 0 ? '+' : ''}${Math.round(minSurplus)} m³/s`;
+      document.getElementById('scorecardBiomass').textContent = `${peakBiomass.toFixed(1)}%`;
+      document.getElementById('scorecardSurplus').textContent = `${minSurplus >= 0 ? '+' : ''}${Math.round(minSurplus)} m³/s`;
+
+      // Risk classification
+      let riskTier = "NORMAL";
+      let riskColor = "bg-emerald-950/80 text-emerald-300 border-emerald-600";
+
+      if (peakBiomass >= 70 || minSurplus < 0) {
+        riskTier = "CRITICAL EMERGENCY";
+        riskColor = "bg-rose-950/80 text-rose-300 border-rose-600";
+      } else if (peakBiomass >= 45 || minSurplus < 20) {
+        riskTier = "WARNING RISK";
+        riskColor = "bg-amber-950/80 text-amber-300 border-amber-600";
+      } else if (peakBiomass >= 25) {
+        riskTier = "WATCH STATUS";
+        riskColor = "bg-blue-950/80 text-blue-300 border-blue-600";
+      }
+
+      const riskPill = document.getElementById('kpiRiskPill');
+      riskPill.className = `px-2.5 py-1 rounded-full text-xs font-bold border pulse-risk ${riskColor}`;
+      riskPill.textContent = `${riskTier === 'NORMAL' ? '🟢' : riskTier === 'WATCH STATUS' ? '🔵' : riskTier === 'WARNING RISK' ? '⚠️' : '🚨'} ${riskTier}`;
+      
+      document.getElementById('scorecardRiskTier').textContent = riskTier;
+    }
+
+    function applyPreset(preset) {
+      if (preset === 'baseline') {
+        document.getElementById('sliderTemp').value = 0.0;
+        document.getElementById('sliderFlush').value = 0;
+        document.getElementById('sliderMoratorium').value = 0;
+      } else if (preset === 'heatwave') {
+        document.getElementById('sliderTemp').value = 2.8;
+        document.getElementById('sliderFlush').value = 0;
+        document.getElementById('sliderMoratorium').value = 0;
+      } else if (preset === 'flushing') {
+        document.getElementById('sliderTemp').value = 1.8;
+        document.getElementById('sliderFlush').value = 45;
+        document.getElementById('sliderMoratorium').value = 15;
+      } else if (preset === 'crisis') {
+        document.getElementById('sliderTemp').value = 3.6;
+        document.getElementById('sliderFlush').value = 0;
+        document.getElementById('sliderMoratorium').value = 35;
+      }
+      updateSimulation();
+    }
+
+    function toggleNormalize() {
+      isNormalized = !isNormalized;
+      const btn = document.getElementById('toggleNormBtn');
+      if (isNormalized) {
+        btn.classList.add('bg-cyan-600', 'text-white', 'border-cyan-500');
+        btn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      } else {
+        btn.classList.remove('bg-cyan-600', 'text-white', 'border-cyan-500');
+        btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      }
+      updateSimulation();
+    }
+
+    function toggleTrendlines() {
+      showTrendlines = !showTrendlines;
+      const btn = document.getElementById('toggleTrendBtn');
+      if (showTrendlines) {
+        btn.classList.add('bg-cyan-600', 'text-white', 'border-cyan-500');
+        btn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      } else {
+        btn.classList.remove('bg-cyan-600', 'text-white', 'border-cyan-500');
+        btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      }
+      updateSimulation();
+    }
+
+    // -----------------------------------------------------------------
+    // 6. INITIALIZATION ON PAGE LOAD
+    // -----------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      
+      document.getElementById('yearSelect').addEventListener('change', (e) => {
+        activeYear = parseInt(e.target.value);
+        updateSimulation();
+      });
+
+      selectBasin('oder_river');
+    });
+  </script>
+</body>
+</html>
