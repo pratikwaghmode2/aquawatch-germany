@@ -2,7 +2,7 @@
 
 > **EIT Water Hackathon Munich 2026** — *Challenge 4: Earth Observation for Freshwater Quality & Hydraulic Risk Management*
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=pratikwaghmode2/aquawatch-germany&branch=main&mainModule=app.py)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
