@@ -1,0 +1,80 @@
+{
+  "basin_key": "oder_river",
+  "scenario_pre_conditions": {
+    "temperature_delta_c": 2.0,
+    "consecutive_exceedance_days": 5,
+    "threshold_c": 22.0,
+    "wind_mixing": "stagnant",
+    "trophic_state": "eutrophic"
+  },
+  "projected_mean_bsi": 0.858,
+  "tier_distribution_pct": {
+    "clear": 0.0,
+    "watch": 0.0,
+    "warning": 23.0,
+    "critical": 77.0
+  },
+  "forward_trajectory": [
+    {
+      "day": 0,
+      "projected_mean_bsi": 0.343,
+      "critical_risk_coverage_pct": 0.0,
+      "warning_risk_coverage_pct": 0.0
+    },
+    {
+      "day": 1,
+      "projected_mean_bsi": 0.417,
+      "critical_risk_coverage_pct": 6.1,
+      "warning_risk_coverage_pct": 3.3
+    },
+    {
+      "day": 3,
+      "projected_mean_bsi": 0.564,
+      "critical_risk_coverage_pct": 25.6,
+      "warning_risk_coverage_pct": 9.9
+    },
+    {
+      "day": 5,
+      "projected_mean_bsi": 0.711,
+      "critical_risk_coverage_pct": 49.7,
+      "warning_risk_coverage_pct": 16.5
+    },
+    {
+      "day": 7,
+      "projected_mean_bsi": 0.858,
+      "critical_risk_coverage_pct": 77.0,
+      "warning_risk_coverage_pct": 23.0
+    }
+  ],
+  "identified_hotspots": [
+    {
+      "hotspot_id": "ODER-HS-01",
+      "name": "Frankfurt (Oder) / S\u0142ubice Groyne Field Stagnation Zone",
+      "risk_tier": "CRITICAL",
+      "hazard_score": 0.88,
+      "coordinates": [
+        52.35,
+        14.55
+      ],
+      "vulnerability_driver": "Low river flow (<0.2 m/s), high water temp (>25\u00b0C), and stagnant water retention between river groynes.",
+      "prescribed_intervention": "Targeted hydraulic flushing pulse (45-60 m\u00b3/s) and mobile boat aeration."
+    },
+    {
+      "hotspot_id": "ODER-HS-02",
+      "name": "Kostrzyn nad Odr\u0105 Confluence Backwater",
+      "risk_tier": "CRITICAL",
+      "hazard_score": 0.84,
+      "coordinates": [
+        52.58,
+        14.65
+      ],
+      "vulnerability_driver": "Nutrient concentration and slow water exchange at the Warta-Oder river junction.",
+      "prescribed_intervention": "Suspend riverbank filtration wells; increase water quality grab sampling cadence to 12h."
+    }
+  ],
+  "water_authority_advisory": {
+    "alert_code": "RED_ALERT",
+    "headline": "CRITICAL ALGAL BLOOM EMERGENCY",
+    "action_recommendation": "Issue public contact recreation ban. Divert municipal drinking water intakes to secondary/deep intakes. Initiate activated carbon dosing at treatment facilities. Deploy floating boom barriers around critical harbor and marina zones."
+  }
+}

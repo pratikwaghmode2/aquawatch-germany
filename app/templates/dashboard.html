@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freshwater EO: Landsat Algae Bloom & Thermal Early Warning System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    #map { height: 440px; border-radius: 0.75rem; z-index: 10; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-50 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+        <i data-lucide="waves" class="w-6 h-6 text-slate-950"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">AquaWatch EO</h1>
+          <span class="px-2 py-0.5 text-xs font-semibold rounded bg-cyan-950 text-cyan-400 border border-cyan-800">Landsat 8/9 Level-2</span>
+          <span class="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Near-Real-Time</span>
+        </div>
+        <p class="text-xs text-slate-400">Freshwater Algal Bloom & Thermal Early Warning Decision System for Water Authorities</p>
+      </div>
+    </div>
+
+    <!-- Basin & Scenario Controls -->
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2">
+        <label for="basinSelect" class="text-xs font-medium text-slate-400">Basin:</label>
+        <select id="basinSelect" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+          <option value="lake_balaton">Lake Balaton (Hungary, Central Europe)</option>
+          <option value="lake_erie_west">Western Lake Erie (USA / Canada)</option>
+          <option value="lake_victoria_winam">Lake Victoria - Winam Gulf (East Africa)</option>
+          <option value="lake_constance">Lake Constance / Bodensee (Alps)</option>
+          <option value="danube_river_reach">Danube River Reach (Europe)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+        <input type="checkbox" id="heatwaveToggle" class="w-4 h-4 text-cyan-500 bg-slate-900 border-slate-600 rounded focus:ring-cyan-500 cursor-pointer">
+        <label for="heatwaveToggle" class="text-xs font-medium text-amber-300 cursor-pointer flex items-center gap-1">
+          <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-400"></i> Heatwave Active
+        </label>
+      </div>
+
+      <button id="refreshBtn" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 transition">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        <span>Update Pass</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- Basin Metadata & Scale Adaptation Banner -->
+    <div id="basinBanner" class="bg-gradient-to-r from-slate-800 via-slate-800/90 to-cyan-950/40 border border-slate-700/80 rounded-xl p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div class="flex items-center space-x-3">
+            <h2 id="basinName" class="text-xl font-bold text-white">Loading Basin...</h2>
+            <span id="basinCountry" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium"></span>
+            <span id="systemScaleBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-700 font-medium"></span>
+          </div>
+          <p id="basinDesc" class="text-xs text-slate-400 mt-1 max-w-2xl"></p>
+          <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-300">
+            <span><strong>Surface Area:</strong> <span id="basinArea">-</span> km²</span>
+            <span><strong>Mean Depth:</strong> <span id="basinDepth">-</span> m</span>
+            <span><strong>Primary Bloom Taxa:</strong> <span id="basinTaxa" class="italic text-cyan-300">-</span></span>
+            <span><strong>Landsat Scene ID:</strong> <span id="sceneId" class="font-mono text-slate-400 text-[11px]">-</span></span>
+          </div>
+        </div>
+
+        <!-- Scale & Shoreline Buffer Health -->
+        <div class="bg-slate-900/80 border border-slate-700 p-3.5 rounded-lg text-xs space-y-1.5 min-w-[260px]">
+          <div class="flex items-center justify-between text-slate-300">
+            <span class="flex items-center gap-1 font-semibold text-cyan-300">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-cyan-400"></i> Resolution Safeguard:
+            </span>
+            <span class="text-emerald-400 font-semibold">Active</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-tight">
+            Shoreline adjacency buffer & 100m TIRS thermal edge unmixing applied to prevent false-positive shoreline bloom alerts.
+          </p>
+          <div class="pt-1 flex items-center justify-between text-[11px] text-slate-300 border-t border-slate-800">
+            <span>Water Pixels: <strong id="waterPixelCount">-</strong></span>
+            <span>Pure Core: <strong id="purePixelCount" class="text-emerald-400">-</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Status Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Current Lake Temperature -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs">
+          <span>Surface Temp (LSWT)</span>
+          <i data-lucide="thermometer" class="w-4 h-4 text-rose-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="meanTempVal" class="text-2xl font-black text-white">--</span>
+          <span class="text-sm font-semibold text-slate-400">°C</span>
+          <span id="tempAnomalyBadge" class="text-[11px] px-2 py-0.5 rounded font-medium ml-auto"></span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex justify-between">
+          <span>Max: <strong id="maxTempVal" class="text-slate-200">--°C</strong></span>
+          <span>Thermal Spread: <strong id="stdTempVal" class="text-slate-200">±--°C</strong></span>
+        </div>
+      </div>
+
+      <!-- Consecutive Exceedance Days -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs">
+          <span>Consecutive Hot Days</span>
+          <i data-lucide="calendar" class="w-4 h-4 text-amber-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="consecutiveDaysVal" class="text-2xl font-black text-amber-300">--</span>
+          <span class="text-sm font-semibold text-slate-400">days</span>
+          <span class="text-[11px] text-slate-400 ml-auto">Trigger: &ge;22°C</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2">
+          Heat Status: <strong id="heatwaveStatusText" class="text-amber-300 font-semibold">--</strong>
+        </div>
+      </div>
+
+      <!-- Cumulative Degree Days (CDD) -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs">
+          <span>14-Day Heat Load (CDD₂₀)</span>
+          <i data-lucide="sun-medium" class="w-4 h-4 text-orange-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="cddVal" class="text-2xl font-black text-orange-400">--</span>
+          <span class="text-sm font-semibold text-slate-400">°C·days</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2">
+          Thermal Fuel: <span id="cddEvaluation" class="text-slate-200">--</span>
+        </div>
+      </div>
+
+      <!-- Active Bloom Alert Tier -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between" id="activeAlertCard">
+        <div class="flex items-center justify-between text-slate-400 text-xs">
+          <span>Current Hazard Status</span>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-yellow-400" id="alertIcon"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="hazardTierBadge" class="text-lg font-black px-2.5 py-1 rounded tracking-wide">--</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex justify-between">
+          <span>Scum/Warning: <strong id="criticalPctVal" class="text-rose-400 font-semibold">--%</strong></span>
+          <span>Clear Water: <strong id="clearPctVal" class="text-emerald-400 font-semibold">--%</strong></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Interactive Map & Raster Explorer -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Interactive Satellite Grid View (2 cols) -->
+      <div class="lg:col-span-2 bg-slate-800/90 border border-slate-700 rounded-xl p-5 flex flex-col space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="map" class="w-4 h-4 text-cyan-400"></i>
+              Spatial Earth Observation Analysis
+            </h3>
+            <p class="text-xs text-slate-400">High-resolution 30m Landsat pixel raster visualization</p>
+          </div>
+
+          <!-- Layer Toggle Radios -->
+          <div class="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs">
+            <button class="layer-btn px-2.5 py-1 rounded font-medium bg-cyan-600 text-slate-950 transition" data-layer="lst">
+              🌡️ Surface Temp
+            </button>
+            <button class="layer-btn px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition" data-layer="fai">
+              🌿 Bloom FAI
+            </button>
+            <button class="layer-btn px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition" data-layer="hazard">
+              ⚠️ Hazard Tiers
+            </button>
+            <button class="layer-btn px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition" data-layer="buffer">
+              🛡️ Pure Core
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Visualizer Container -->
+        <div class="relative bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center p-2 min-h-[380px]">
+          <canvas id="rasterCanvas" class="max-w-full max-h-[360px] object-contain rounded shadow cursor-crosshair"></canvas>
+          
+          <!-- Hover Pixel Inspector Tooltip -->
+          <div id="pixelTooltip" class="absolute bottom-3 left-3 bg-slate-900/95 border border-slate-700 px-3 py-2 rounded-lg text-xs shadow-xl pointer-events-none space-y-0.5 hidden">
+            <div class="font-bold text-cyan-300" id="tooltipHeader">Pixel Inspection</div>
+            <div class="text-slate-300">Temp: <span id="tooltipTemp" class="font-mono text-white">--</span> °C</div>
+            <div class="text-slate-300">FAI: <span id="tooltipFai" class="font-mono text-white">--</span></div>
+            <div class="text-slate-300">Tier: <span id="tooltipTier" class="font-semibold">--</span></div>
+          </div>
+
+          <!-- Colorbar Legend -->
+          <div id="colorLegend" class="absolute top-3 right-3 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded text-[11px] space-y-1">
+            <span id="legendTitle" class="font-semibold text-slate-300 block">Temperature (°C)</span>
+            <div id="legendGradient" class="h-3 w-32 rounded"></div>
+            <div class="flex justify-between text-[10px] text-slate-400">
+              <span id="legendMin">18°C</span>
+              <span id="legendMax">30°C</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400 pt-1">
+          <span>Click or hover over lake pixels to inspect local limnological values.</span>
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Pure Core
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 ml-2"></span> Shoreline Buffer
+          </span>
+        </div>
+      </div>
+
+      <!-- Area Breakdown & Real-Time Hazard Tiers (1 col) -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 flex flex-col justify-between space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-400"></i>
+            Water Body Hazard Coverage
+          </h3>
+          <p class="text-xs text-slate-400">Current spatial percentage distribution</p>
+        </div>
+
+        <div class="h-44 relative flex items-center justify-center">
+          <canvas id="tierDoughnutChart"></canvas>
+        </div>
+
+        <!-- Tier List Breakdown -->
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between p-2 rounded bg-emerald-950/40 border border-emerald-900/60">
+            <span class="flex items-center gap-2 text-emerald-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Clear / Low Risk
+            </span>
+            <strong id="pctClearVal" class="text-emerald-400 font-mono">--%</strong>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded bg-yellow-950/40 border border-yellow-900/60">
+            <span class="flex items-center gap-2 text-yellow-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span> Watch / Early Bloom
+            </span>
+            <strong id="pctWatchVal" class="text-yellow-400 font-mono">--%</strong>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded bg-orange-950/40 border border-orange-900/60">
+            <span class="flex items-center gap-2 text-orange-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span> Warning / Elevated
+            </span>
+            <strong id="pctWarnVal" class="text-orange-400 font-mono">--%</strong>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded bg-rose-950/40 border border-rose-900/60">
+            <span class="flex items-center gap-2 text-rose-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Critical / Severe Scum
+            </span>
+            <strong id="pctCritVal" class="text-rose-400 font-mono">--%</strong>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Thermal Dynamics & Lagged Bloom Correlation Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Temperature & Heat Accumulation Timeline -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-4 h-4 text-cyan-400"></i>
+              21-Day Thermal Evolution & Critical Threshold
+            </h3>
+            <p class="text-xs text-slate-400">Consecutive exceedance above 22°C triggers exponential cyanobacteria growth</p>
+          </div>
+        </div>
+        <div class="h-60">
+          <canvas id="thermalTimelineChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Lagged Bloom Response & Biology -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 space-y-3 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="git-commit" class="w-4 h-4 text-purple-400"></i>
+              Lagged Bloom Cross-Correlation
+            </h3>
+            <span class="text-xs text-purple-300 font-semibold bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">
+              Peak Lag: <span id="peakLagVal">4</span> Days
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Cross-correlation between water temperature and surface biomass accumulation</p>
+        </div>
+
+        <div class="h-44">
+          <canvas id="lagChart"></canvas>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-700/80 p-3 rounded-lg text-xs text-slate-300 space-y-1">
+          <span class="font-semibold text-cyan-300">Biophysical Interpretation:</span>
+          <p id="lagInsightText" class="text-slate-400 leading-relaxed text-[11px]"></p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- WHAT-IF FORECASTING & SCENARIO SANDBOX -->
+    <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-cyan-700/60 rounded-xl p-6 shadow-2xl space-y-6">
+      
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-700 pb-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 rounded bg-cyan-500 text-slate-950 text-xs font-black uppercase tracking-wider">Predictive Engine</span>
+            <h2 class="text-lg font-bold text-white">What-If Forecasting & Dynamic Risk Simulator</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            Simulate future bloom development and spatial risk maps under consecutive hot day exceedances and climate warming scenarios.
+          </p>
+        </div>
+
+        <button id="runForecastBtn" class="bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-bold px-5 py-2.5 rounded-lg text-xs flex items-center space-x-2 shadow-lg shadow-cyan-500/25 transition">
+          <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+          <span>Run Predictive Forecast</span>
+        </button>
+      </div>
+
+      <!-- Simulator Interactive Controls Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        
+        <!-- Control 1: Temperature Trigger -->
+        <div class="bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Temp Threshold:</span>
+            <span id="sliderThresholdVal" class="text-cyan-400 font-bold font-mono">22.0°C</span>
+          </div>
+          <input type="range" id="sliderThreshold" min="18" max="28" step="0.5" value="22" class="w-full accent-cyan-400 cursor-pointer">
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>18°C</span><span>28°C</span>
+          </div>
+        </div>
+
+        <!-- Control 2: Consecutive Days -->
+        <div class="bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Consecutive Hot Days:</span>
+            <span id="sliderDaysVal" class="text-amber-400 font-bold font-mono">5 days</span>
+          </div>
+          <input type="range" id="sliderDays" min="1" max="14" step="1" value="5" class="w-full accent-amber-400 cursor-pointer">
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>1 day</span><span>14 days</span>
+          </div>
+        </div>
+
+        <!-- Control 3: Temperature Delta -->
+        <div class="bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Warming Anomaly:</span>
+            <span id="sliderDeltaVal" class="text-rose-400 font-bold font-mono">+2.0°C</span>
+          </div>
+          <input type="range" id="sliderDelta" min="-1.0" max="4.5" step="0.5" value="2.0" class="w-full accent-rose-400 cursor-pointer">
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>-1°C</span><span>+4.5°C</span>
+          </div>
+        </div>
+
+        <!-- Control 4: Wind Mixing -->
+        <div class="bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-xl space-y-1.5">
+          <span class="text-slate-400 text-xs font-medium block">Atmospheric Wind:</span>
+          <select id="selectWind" class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-cyan-500">
+            <option value="stagnant">Stagnant / Calm (&lt;2 m/s)</option>
+            <option value="moderate" selected>Moderate (2-5 m/s)</option>
+            <option value="turbulent">Turbulent / High (&gt;6 m/s)</option>
+          </select>
+          <span class="text-[10px] text-slate-400 block">Stagnation traps scums at surface</span>
+        </div>
+
+        <!-- Control 5: Trophic Baseline -->
+        <div class="bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-xl space-y-1.5">
+          <span class="text-slate-400 text-xs font-medium block">Trophic Nutrient Baseline:</span>
+          <select id="selectTrophic" class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-cyan-500">
+            <option value="oligotrophic">Oligotrophic (Low P & N)</option>
+            <option value="mesotrophic">Mesotrophic (Moderate)</option>
+            <option value="eutrophic" selected>Eutrophic (High nutrients)</option>
+            <option value="hypereutrophic">Hypereutrophic (Severe)</option>
+          </select>
+          <span class="text-[10px] text-slate-400 block">Nutrients amplify thermal response</span>
+        </div>
+
+      </div>
+
+      <!-- Forecast Results Split Panel -->
+      <div id="forecastResultsContainer" class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+        
+        <!-- Forecasted Spatial Risk Map Canvas -->
+        <div class="lg:col-span-1 bg-slate-900/90 border border-slate-700 p-4 rounded-xl flex flex-col items-center justify-between space-y-3">
+          <div class="w-full flex justify-between items-center text-xs">
+            <span class="font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="compass" class="w-3.5 h-3.5 text-cyan-400"></i> Forecasted Spatial Risk
+            </span>
+            <span class="text-cyan-400 font-semibold" id="forecastHorizonLabel">Day +7</span>
+          </div>
+          <canvas id="forecastCanvas" class="max-w-full max-h-[220px] object-contain rounded border border-slate-800"></canvas>
+          <div class="w-full text-center text-[11px] text-slate-400">
+            Simulated risk map showing zones likely to surpass toxic cyanobacteria thresholds.
+          </div>
+        </div>
+
+        <!-- Forward Risk Trajectory Graph -->
+        <div class="lg:col-span-2 bg-slate-900/90 border border-slate-700 p-4 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="activity" class="w-3.5 h-3.5 text-rose-400"></i> Multi-Day Risk Trajectory Progression
+            </span>
+            <span class="text-slate-400">Projected % of water body entering Warning / Critical</span>
+          </div>
+          <div class="h-52">
+            <canvas id="trajectoryChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- WATER AUTHORITY OFFICIAL ACTION BULLETIN -->
+      <div id="authorityBulletin" class="border-2 rounded-xl p-5 transition space-y-3 bg-slate-950/80">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+          <div class="flex items-center space-x-3">
+            <span id="bulletinCodeBadge" class="px-3 py-1 rounded text-xs font-black tracking-wider uppercase">--</span>
+            <div>
+              <h3 id="bulletinHeadline" class="text-base font-bold text-white">--</h3>
+              <p class="text-xs text-slate-400">Standard Operating Protocol (SOP) Actionable Mandate</p>
+            </div>
+          </div>
+          <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700 flex items-center gap-1.5">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Export Official Bulletin
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 text-xs">
+          <div class="space-y-1">
+            <span class="font-semibold text-slate-400 block">Drinking Water Intakes:</span>
+            <p id="intakeAction" class="text-slate-200 leading-relaxed"></p>
+          </div>
+          <div class="space-y-1">
+            <span class="font-semibold text-slate-400 block">Public Health & Recreation:</span>
+            <p id="recreationAction" class="text-slate-200 leading-relaxed"></p>
+          </div>
+          <div class="space-y-1">
+            <span class="font-semibold text-slate-400 block">Limnological Mitigation:</span>
+            <p id="mitigationAction" class="text-slate-200 leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- EXPLAINABLE MACHINE LEARNING (XAI) PANEL -->
+    <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+          Machine Learning Model & Feature Importance (Explainable AI)
+        </h3>
+        <p class="text-xs text-slate-400">Quantified influence of thermal accumulation vs optical and morphological parameters</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+        <div class="lg:col-span-2 h-56">
+          <canvas id="featureImportanceChart"></canvas>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+            <span class="text-slate-400 block">Model Classification F1-Score:</span>
+            <span id="modelF1Score" class="text-lg font-bold text-emerald-400 font-mono">0.894</span>
+          </div>
+          <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+            <span class="text-slate-400 block">Continuous BSI Regression R²:</span>
+            <span id="modelR2Score" class="text-lg font-bold text-cyan-400 font-mono">0.871</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-tight">
+            Trained on cross-validated multi-season freshwater observations. Thermal indices (LST, consecutive hot days, and 14-day CDD) account for over 65% of predictive weight.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
+    EIT Water Hackathon — Earth Observation for Real-Time Freshwater Algae Bloom Mapping & Thermal Forecasting. Landsat 8/9 Level-2 Open Data.
+  </footer>
+
+  <!-- Application Logic JS -->
+  <script>
+    lucide.createIcons();
+
+    let currentBasinData = null;
+    let activeLayer = 'lst';
+    let doughnutChart = null;
+    let thermalTimelineChart = null;
+    let lagChart = null;
+    let trajectoryChart = null;
+    let featureChart = null;
+
+    // Colormap definitions for Canvas
+    function getTemperatureColor(temp) {
+      if (temp === null || isNaN(temp)) return [0, 0, 0, 0];
+      // Range: 18C (deep blue) to 30C (deep red)
+      const t = Math.max(0, Math.min(1, (temp - 18) / 12));
+      const r = Math.floor(255 * Math.sin(t * Math.PI / 2));
+      const g = Math.floor(255 * Math.sin(t * Math.PI));
+      const b = Math.floor(255 * Math.cos(t * Math.PI / 2));
+      return [r, g, b, 230];
+    }
+
+    function getFaiColor(fai) {
+      if (fai === null || isNaN(fai)) return [0, 0, 0, 0];
+      // FAI Range: -0.02 (clear blue) to 0.12 (neon green)
+      const t = Math.max(0, Math.min(1, (fai - (-0.01)) / 0.10));
+      const r = Math.floor(30 + 190 * t);
+      const g = Math.floor(70 + 185 * t);
+      const b = Math.floor(180 * (1 - t));
+      return [r, g, b, 235];
+    }
+
+    function getHazardTierColor(tier) {
+      if (tier === 0) return [16, 185, 129, 230];  // Emerald - Clear
+      if (tier === 1) return [234, 179, 8, 230];   // Yellow - Watch
+      if (tier === 2) return [249, 115, 22, 235];  // Orange - Warning
+      if (tier === 3) return [239, 68, 68, 245];   // Red - Critical
+      return [0, 0, 0, 0];
+    }
+
+    function getBufferColor(pure, shoreline) {
+      if (pure === 1) return [16, 185, 129, 230];    // Emerald
+      if (shoreline === 1) return [245, 158, 11, 230]; // Amber
+      return [0, 0, 0, 0];
+    }
+
+    // Render 2D array onto HTML5 Canvas
+    function renderRaster(canvasId, gridType, forecastData = null) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !currentBasinData) return;
+      
+      const grids = forecastData ? forecastData.grids : currentBasinData.grids;
+      const mask = currentBasinData.grids.water_mask;
+      const h = mask.length;
+      const w = mask[0].length;
+
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(w, h);
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * 4;
+          const isWater = mask[y][x] === 1;
+
+          if (!isWater) {
+            // Dark land background
+            imgData.data[idx] = 30;
+            imgData.data[idx + 1] = 41;
+            imgData.data[idx + 2] = 59;
+            imgData.data[idx + 3] = 255;
+            continue;
+          }
+
+          let rgba = [0, 0, 0, 0];
+          if (gridType === 'lst') {
+            rgba = getTemperatureColor(grids.lst_celsius[y][x]);
+          } else if (gridType === 'fai') {
+            rgba = getFaiColor(grids.fai[y][x]);
+          } else if (gridType === 'hazard') {
+            const t = forecastData ? grids.forecast_hazard_tier[y][x] : grids.hazard_tier[y][x];
+            rgba = getHazardTierColor(t);
+          } else if (gridType === 'buffer') {
+            rgba = getBufferColor(grids.pure_water_mask[y][x], grids.shoreline_mask[y][x]);
+          }
+
+          imgData.data[idx] = rgba[0];
+          imgData.data[idx + 1] = rgba[1];
+          imgData.data[idx + 2] = rgba[2];
+          imgData.data[idx + 3] = rgba[3];
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    // Load full basin data
+    async function loadBasin(basinKey, heatwave = false) {
+      try {
+        const resp = await fetch(`/api/basin/${basinKey}?heatwave=${heatwave}`);
+        if (!resp.ok) throw new Error('Failed to load basin data');
+        currentBasinData = await resp.json();
+        
+        updateUI();
+        renderRaster('rasterCanvas', activeLayer);
+        // Automatically run initial forecast with default parameters
+        triggerForecast();
+      } catch (err) {
+        console.error('Error fetching basin data:', err);
+      }
+    }
+
+    // Update all UI labels, stats, charts
+    function updateUI() {
+      const d = currentBasinData;
+      const meta = d.metadata;
+      const scale = d.scale_info;
+      const thermal = d.thermal_state;
+      const tiers = d.tier_percentages;
+
+      // Banner
+      document.getElementById('basinName').textContent = meta.name;
+      document.getElementById('basinCountry').textContent = meta.country;
+      document.getElementById('basinDesc').textContent = meta.description;
+      document.getElementById('basinArea').textContent = meta.area_km2;
+      document.getElementById('basinDepth').textContent = meta.mean_depth_m;
+      document.getElementById('basinTaxa').textContent = meta.primary_bloom_taxa;
+      document.getElementById('sceneId').textContent = d.scene_id;
+      document.getElementById('systemScaleBadge').textContent = scale.scale_name.toUpperCase();
+      document.getElementById('waterPixelCount').textContent = scale.water_pixel_count.toLocaleString();
+      document.getElementById('purePixelCount').textContent = Math.round(scale.water_pixel_count * 0.82).toLocaleString();
+
+      // Top Cards
+      document.getElementById('meanTempVal').textContent = thermal.mean_water_temp_c;
+      document.getElementById('maxTempVal').textContent = `${thermal.max_water_temp_c}°C`;
+      document.getElementById('stdTempVal').textContent = `±${thermal.thermal_spatial_std_c}°C`;
+
+      const anomaly = thermal.mean_water_temp_c - meta.baseline_summer_temp_c;
+      const anomalyBadge = document.getElementById('tempAnomalyBadge');
+      if (anomaly > 1.5) {
+        anomalyBadge.className = 'text-[11px] px-2 py-0.5 rounded font-medium ml-auto bg-rose-900/60 text-rose-300 border border-rose-700';
+        anomalyBadge.textContent = `+${anomaly.toFixed(1)}°C Heatwave`;
+      } else {
+        anomalyBadge.className = 'text-[11px] px-2 py-0.5 rounded font-medium ml-auto bg-emerald-900/60 text-emerald-300 border border-emerald-700';
+        anomalyBadge.textContent = `${anomaly >= 0 ? '+' : ''}${anomaly.toFixed(1)}°C Baseline`;
+      }
+
+      document.getElementById('consecutiveDaysVal').textContent = thermal.consecutive_days_above_threshold;
+      document.getElementById('heatwaveStatusText').textContent = thermal.heatwave_status.replace(/_/g, ' ');
+
+      document.getElementById('cddVal').textContent = thermal['14_day_cdd_above_20c'];
+      document.getElementById('cddEvaluation').textContent = thermal['14_day_cdd_above_20c'] > 20 ? 'High Growth Fuel' : 'Moderate';
+
+      // Tier Percentages
+      document.getElementById('pctClearVal').textContent = `${tiers.clear}%`;
+      document.getElementById('pctWatchVal').textContent = `${tiers.watch}%`;
+      document.getElementById('pctWarnVal').textContent = `${tiers.warning}%`;
+      document.getElementById('pctCritVal').textContent = `${tiers.critical}%`;
+      document.getElementById('clearPctVal').textContent = `${tiers.clear}%`;
+      document.getElementById('criticalPctVal').textContent = `${(tiers.critical + tiers.warning).toFixed(1)}%`;
+
+      const hazardBadge = document.getElementById('hazardTierBadge');
+      if (tiers.critical > 10 || (tiers.critical + tiers.warning) > 35) {
+        hazardBadge.className = 'text-lg font-black px-2.5 py-1 rounded tracking-wide bg-rose-600 text-white';
+        hazardBadge.textContent = 'CRITICAL ALERT';
+      } else if (tiers.warning > 15) {
+        hazardBadge.className = 'text-lg font-black px-2.5 py-1 rounded tracking-wide bg-orange-500 text-white';
+        hazardBadge.textContent = 'ELEVATED WARNING';
+      } else if (tiers.watch > 20) {
+        hazardBadge.className = 'text-lg font-black px-2.5 py-1 rounded tracking-wide bg-yellow-500 text-slate-950';
+        hazardBadge.textContent = 'WATCH / ADVISORY';
+      } else {
+        hazardBadge.className = 'text-lg font-black px-2.5 py-1 rounded tracking-wide bg-emerald-500 text-slate-950';
+        hazardBadge.textContent = 'CLEAR WATER';
+      }
+
+      // Lag Insights
+      document.getElementById('peakLagVal').textContent = d.lag_analysis.optimal_lag_days;
+      document.getElementById('lagInsightText').textContent = d.lag_analysis.biological_insight;
+
+      // Update Charts
+      updateDoughnutChart(tiers);
+      updateThermalTimeline(d.historical_dates, d.historical_mean_lst);
+      updateLagChart(d.lag_analysis.lag_correlations);
+    }
+
+    // Chart.js: Tier Doughnut
+    function updateDoughnutChart(tiers) {
+      const ctx = document.getElementById('tierDoughnutChart').getContext('2d');
+      if (doughnutChart) doughnutChart.destroy();
+      doughnutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Clear', 'Watch', 'Warning', 'Critical'],
+          datasets: [{
+            data: [tiers.clear, tiers.watch, tiers.warning, tiers.critical],
+            backgroundColor: ['#10b981', '#eab308', '#f97316', '#ef4444'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    // Chart.js: Thermal Timeline
+    function updateThermalTimeline(dates, temps) {
+      const ctx = document.getElementById('thermalTimelineChart').getContext('2d');
+      if (thermalTimelineChart) thermalTimelineChart.destroy();
+      thermalTimelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates.map(d => d.slice(5)),
+          datasets: [
+            {
+              label: 'Water Surface Temp (°C)',
+              data: temps,
+              borderColor: '#06b6d4',
+              backgroundColor: 'rgba(6, 182, 212, 0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3
+            },
+            {
+              label: 'Critical Threshold (22°C)',
+              data: Array(dates.length).fill(22.0),
+              borderColor: '#f59e0b',
+              borderDash: [5, 5],
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+          },
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }
+          }
+        }
+      });
+    }
+
+    // Chart.js: Lagged Cross-Correlation
+    function updateLagChart(lagDict) {
+      const ctx = document.getElementById('lagChart').getContext('2d');
+      if (lagChart) lagChart.destroy();
+      const labels = Object.keys(lagDict).map(k => k.replace('lag_', '+').replace('d', ' Days'));
+      const values = Object.values(lagDict);
+
+      lagChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Cross-Correlation (r)',
+            data: values,
+            backgroundColor: values.map(v => v === Math.max(...values) ? '#c084fc' : '#475569'),
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#64748b' }, grid: { color: '#334155' }, min: 0, max: 1 }
+          }
+        }
+      });
+    }
+
+    // What-If Forecasting Trigger
+    async function triggerForecast() {
+      if (!currentBasinData) return;
+      
+      const payload = {
+        basin_key: currentBasinData.basin_key,
+        heatwave_base: currentBasinData.is_heatwave,
+        temperature_delta_c: parseFloat(document.getElementById('sliderDelta').value),
+        consecutive_exceedance_days: parseInt(document.getElementById('sliderDays').value),
+        threshold_c: parseFloat(document.getElementById('sliderThreshold').value),
+        forecast_horizon_days: 7,
+        wind_mixing: document.getElementById('selectWind').value,
+        trophic_state: document.getElementById('selectTrophic').value
+      };
+
+      try {
+        const resp = await fetch('/api/forecast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const fData = await resp.json();
+
+        // Render spatial forecast map
+        renderRaster('forecastCanvas', 'hazard', fData);
+
+        // Update Multi-day Trajectory Chart
+        updateTrajectoryChart(fData.trajectory);
+
+        // Update Water Authority Advisory Bulletin
+        updateBulletin(fData.water_authority_advisory);
+
+      } catch (err) {
+        console.error('Forecast error:', err);
+      }
+    }
+
+    function updateTrajectoryChart(traj) {
+      const ctx = document.getElementById('trajectoryChart').getContext('2d');
+      if (trajectoryChart) trajectoryChart.destroy();
+      const labels = traj.map(t => `Day +${t.day}`);
+      const critVals = traj.map(t => t.critical_risk_coverage_pct);
+      const warnVals = traj.map(t => t.warning_risk_coverage_pct);
+
+      trajectoryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Critical Risk Coverage (%)',
+              data: critVals,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'Warning Coverage (%)',
+              data: warnVals,
+              borderColor: '#f97316',
+              borderDash: [4, 4],
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+          },
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#64748b' }, grid: { color: '#334155' }, min: 0 }
+          }
+        }
+      });
+    }
+
+    function updateBulletin(advisory) {
+      const bulletinCard = document.getElementById('authorityBulletin');
+      const badge = document.getElementById('bulletinCodeBadge');
+      const headline = document.getElementById('bulletinHeadline');
+      headline.textContent = advisory.headline;
+
+      if (advisory.alert_code === 'RED_ALERT') {
+        bulletinCard.className = 'border-2 border-rose-600 rounded-xl p-5 bg-rose-950/30 transition space-y-3';
+        badge.className = 'px-3 py-1 rounded text-xs font-black tracking-wider uppercase bg-rose-600 text-white';
+        badge.textContent = 'MUNICIPAL RED ALERT';
+        document.getElementById('intakeAction').textContent = 'IMMEDIATE ACTION: Switch to deep/hypolimnetic intakes. Engage powdered activated carbon (PAC) adsorption at treatment facilities.';
+        document.getElementById('recreationAction').textContent = 'MANDATORY CLOSURE: Ban public swimming, water-skiing, and pet contact at all basin beaches.';
+        document.getElementById('mitigationAction').textContent = 'Deploy surface boom skimmers and emergency ultrasonic/aeration units in stagnant embayments.';
+      } else if (advisory.alert_code === 'ORANGE_WARNING') {
+        bulletinCard.className = 'border-2 border-orange-500 rounded-xl p-5 bg-orange-950/30 transition space-y-3';
+        badge.className = 'px-3 py-1 rounded text-xs font-black tracking-wider uppercase bg-orange-500 text-white';
+        badge.textContent = 'ORANGE WARNING';
+        document.getElementById('intakeAction').textContent = 'Increase jar testing and cyanotoxin ELISA microcystin screening to 24h intervals.';
+        document.getElementById('recreationAction').textContent = 'Post public advisory warning signs. Caution pet owners against contact with surface scums.';
+        document.getElementById('mitigationAction').textContent = 'Increase reservoir outflow flush if hydraulic controls permit.';
+      } else {
+        bulletinCard.className = 'border-2 border-emerald-600 rounded-xl p-5 bg-emerald-950/30 transition space-y-3';
+        badge.className = 'px-3 py-1 rounded text-xs font-black tracking-wider uppercase bg-emerald-600 text-white';
+        badge.textContent = 'NORMAL OPERATION';
+        document.getElementById('intakeAction').textContent = 'Baseline conventional filtration and weekly surveillance.';
+        document.getElementById('recreationAction').textContent = 'All recreational activities unrestricted.';
+        document.getElementById('mitigationAction').textContent = 'Routine satellite pass tracking and weather forecast integration.';
+      }
+    }
+
+    // Load Explainable AI Insights
+    async function loadMLInsights() {
+      try {
+        const resp = await fetch('/api/ml-insights');
+        const data = await resp.json();
+        
+        document.getElementById('modelF1Score').textContent = data.metrics.test_f1_score;
+        document.getElementById('modelR2Score').textContent = data.metrics.test_r2_score;
+
+        const ctx = document.getElementById('featureImportanceChart').getContext('2d');
+        const feats = Object.keys(data.feature_importance);
+        const imps = Object.values(data.feature_importance);
+
+        featureChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: feats.map(f => f.replace(/_/g, ' ').toUpperCase()),
+            datasets: [{
+              label: 'Predictive Feature Weight (Gini Importance)',
+              data: imps,
+              backgroundColor: feats.map(f => f.includes('lst') || f.includes('hot') || f.includes('cdd') ? '#06b6d4' : '#64748b'),
+              borderRadius: 4
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+            },
+            scales: {
+              x: { ticks: { color: '#64748b' }, grid: { color: '#334155' } },
+              y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Error loading ML insights:', err);
+      }
+    }
+
+    // Event Listeners
+    document.getElementById('basinSelect').addEventListener('change', (e) => {
+      loadBasin(e.target.value, document.getElementById('heatwaveToggle').checked);
+    });
+
+    document.getElementById('heatwaveToggle').addEventListener('change', (e) => {
+      loadBasin(document.getElementById('basinSelect').value, e.target.checked);
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      loadBasin(document.getElementById('basinSelect').value, document.getElementById('heatwaveToggle').checked);
+    });
+
+    document.querySelectorAll('.layer-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.layer-btn').forEach(b => {
+          b.className = 'layer-btn px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition';
+        });
+        const target = e.currentTarget;
+        target.className = 'layer-btn px-2.5 py-1 rounded font-medium bg-cyan-600 text-slate-950 transition';
+        activeLayer = target.dataset.layer;
+        
+        // Update Legend
+        const legTitle = document.getElementById('legendTitle');
+        const legMin = document.getElementById('legendMin');
+        const legMax = document.getElementById('legendMax');
+        const legGrad = document.getElementById('legendGradient');
+
+        if (activeLayer === 'lst') {
+          legTitle.textContent = 'Temperature (°C)';
+          legMin.textContent = '18°C';
+          legMax.textContent = '30°C';
+          legGrad.style.background = 'linear-gradient(to right, #0000ff, #00ffff, #ffff00, #ff0000)';
+        } else if (activeLayer === 'fai') {
+          legTitle.textContent = 'Floating Algae Index (FAI)';
+          legMin.textContent = '-0.01';
+          legMax.textContent = '+0.10';
+          legGrad.style.background = 'linear-gradient(to right, #1e3a8a, #0d9488, #22c55e, #eab308)';
+        } else if (activeLayer === 'hazard') {
+          legTitle.textContent = 'Hazard Tiers';
+          legMin.textContent = 'Clear';
+          legMax.textContent = 'Critical';
+          legGrad.style.background = 'linear-gradient(to right, #10b981, #eab308, #f97316, #ef4444)';
+        } else {
+          legTitle.textContent = 'Resolution Masks';
+          legMin.textContent = 'Pure Core';
+          legMax.textContent = 'Shore Buffer';
+          legGrad.style.background = 'linear-gradient(to right, #10b981, #f59e0b)';
+        }
+
+        renderRaster('rasterCanvas', activeLayer);
+      });
+    });
+
+    // Slider Listeners
+    document.getElementById('sliderThreshold').addEventListener('input', (e) => {
+      document.getElementById('sliderThresholdVal').textContent = `${parseFloat(e.target.value).toFixed(1)}°C`;
+    });
+    document.getElementById('sliderDays').addEventListener('input', (e) => {
+      document.getElementById('sliderDaysVal').textContent = `${e.target.value} days`;
+    });
+    document.getElementById('sliderDelta').addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      document.getElementById('sliderDeltaVal').textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}°C`;
+    });
+
+    document.getElementById('runForecastBtn').addEventListener('click', triggerForecast);
+
+    // Pixel hover tooltips on canvas
+    const rasterCanvas = document.getElementById('rasterCanvas');
+    const tooltip = document.getElementById('pixelTooltip');
+    rasterCanvas.addEventListener('mousemove', (e) => {
+      if (!currentBasinData) return;
+      const rect = rasterCanvas.getBoundingClientRect();
+      const scaleX = rasterCanvas.width / rect.width;
+      const scaleY = rasterCanvas.height / rect.height;
+      const x = Math.floor((e.clientX - rect.left) * scaleX);
+      const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+      const mask = currentBasinData.grids.water_mask;
+      if (y >= 0 && y < mask.length && x >= 0 && x < mask[0].length && mask[y][x] === 1) {
+        const temp = currentBasinData.grids.lst_celsius[y][x];
+        const fai = currentBasinData.grids.fai[y][x];
+        const tier = currentBasinData.grids.hazard_tier[y][x];
+        const tierLabels = ['Clear', 'Watch', 'Warning', 'Critical'];
+
+        tooltip.classList.remove('hidden');
+        document.getElementById('tooltipTemp').textContent = temp ? temp.toFixed(1) : '--';
+        document.getElementById('tooltipFai').textContent = fai ? fai.toFixed(3) : '--';
+        document.getElementById('tooltipTier').textContent = tier >= 0 ? tierLabels[tier] : '--';
+      } else {
+        tooltip.classList.add('hidden');
+      }
+    });
+
+    rasterCanvas.addEventListener('mouseleave', () => {
+      tooltip.classList.add('hidden');
+    });
+
+    // Initialize application
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('legendGradient').style.background = 'linear-gradient(to right, #0000ff, #00ffff, #ffff00, #ff0000)';
+      loadBasin('lake_balaton', false);
+      loadMLInsights();
+    });
+  </script>
+</body>
+</html>

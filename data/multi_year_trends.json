@@ -1,0 +1,58 @@
+{
+  "period": "2021-2025 (5-Year Multi-Annual Baseline)",
+  "warming_rate_c_per_decade": 4.09,
+  "r_squared": 0.344,
+  "annual_breakdown": [
+    {
+      "year": 2021,
+      "mean_lst_c": 23.55,
+      "max_lst_c": 26.54,
+      "days_above_22c": 69,
+      "max_consecutive_hot_days": 68,
+      "total_dhd_20": 326.44,
+      "peak_ndvi": 0.431,
+      "critical_bloom_days": 80
+    },
+    {
+      "year": 2022,
+      "mean_lst_c": 26.19,
+      "max_lst_c": 31.84,
+      "days_above_22c": 92,
+      "max_consecutive_hot_days": 92,
+      "total_dhd_20": 569.82,
+      "peak_ndvi": 0.4271,
+      "critical_bloom_days": 88
+    },
+    {
+      "year": 2023,
+      "mean_lst_c": 25.56,
+      "max_lst_c": 30.19,
+      "days_above_22c": 92,
+      "max_consecutive_hot_days": 92,
+      "total_dhd_20": 511.15,
+      "peak_ndvi": 0.4217,
+      "critical_bloom_days": 88
+    },
+    {
+      "year": 2024,
+      "mean_lst_c": 24.96,
+      "max_lst_c": 29.13,
+      "days_above_22c": 88,
+      "max_consecutive_hot_days": 86,
+      "total_dhd_20": 455.97,
+      "peak_ndvi": 0.426,
+      "critical_bloom_days": 87
+    },
+    {
+      "year": 2025,
+      "mean_lst_c": 26.21,
+      "max_lst_c": 31.63,
+      "days_above_22c": 92,
+      "max_consecutive_hot_days": 92,
+      "total_dhd_20": 571.68,
+      "peak_ndvi": 0.4218,
+      "critical_bloom_days": 88
+    }
+  ],
+  "climate_takeaway": "5-Year Multi-Annual Analysis (2021-2025) demonstrates a +4.09\u00b0C/decade warming rate. Consecutive heatwave days >= 22\u00b0C expanded from 68 days (2021) to 92 days (2025), driving an increase in annual critical bloom days from 80 to 88 days."
+}

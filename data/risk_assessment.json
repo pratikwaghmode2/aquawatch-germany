@@ -1,0 +1,14 @@
+{
+  "assessment_date": "2025-08-31",
+  "current_lst_c": 22.51,
+  "current_ndvi": 0.3584,
+  "dhd_7d": 20.1,
+  "dhd_14d": 46.08,
+  "base_temperature_c": 20.0,
+  "consecutive_days_over_threshold": 2,
+  "threshold_c": 22.0,
+  "optimal_lag_days": 0,
+  "peak_lag_correlation": 0.2904,
+  "risk_level": "CRITICAL",
+  "summary": "Lake Surface Temperature is 22.5\u00b0C with a 7-day heat accumulation (DHD_20) of 20.1\u00b0C\u00b7days. Water has exceeded 22.0\u00b0C for 2 consecutive days. Peak bloom response is observed at a 0-day lag (r = 0.29). Current biological risk status: CRITICAL."
+}
